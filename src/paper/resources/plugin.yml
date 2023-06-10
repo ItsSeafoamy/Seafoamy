@@ -1,0 +1,6 @@
+main: me.seafoam.minecraft.seafoamy.paper.SeafoamyPaper
+name: Seafoamy
+version: 1.0
+api-version: 1.19
+author: Seafoam
+depend: [ProtocolLib]
