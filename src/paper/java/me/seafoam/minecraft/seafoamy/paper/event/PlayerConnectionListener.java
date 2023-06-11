@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 public class PlayerConnectionListener implements Listener {
 
@@ -16,6 +17,15 @@ public class PlayerConnectionListener implements Listener {
 
 		if (playerManager instanceof PlayerManagerPaper pmp) {
 			pmp.registerPlayer(event.getPlayer());
+		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void onPlayerQuit(PlayerQuitEvent event) {
+		PlayerManager<?, ?> playerManager = Seafoamy.getPlayerManager();
+
+		if (playerManager instanceof PlayerManagerPaper pmp) {
+			pmp.unregisterPlayer(event.getPlayer());
 		}
 	}
 }
