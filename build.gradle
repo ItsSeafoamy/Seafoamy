@@ -83,10 +83,10 @@ repositories {
 }
 
 dependencies {
-	implementationProvided 'net.kyori:adventure-api:4.25.0'
-	implementationProvided 'net.kyori:adventure-text-minimessage:4.25.0'
-	implementationProvided 'net.kyori:adventure-text-serializer-legacy:4.25.0'
-	implementationProvided 'net.kyori:adventure-text-serializer-gson:4.25.0'
+	implementationProvided 'net.kyori:adventure-api:5.2.0'
+	implementationProvided 'net.kyori:adventure-text-minimessage:5.2.0'
+	implementationProvided 'net.kyori:adventure-text-serializer-legacy:5.2.0'
+	implementationProvided 'net.kyori:adventure-text-serializer-gson:5.2.0'
 	implementationProvided 'com.google.code.gson:gson:2.9.1'
 	implementationProvided 'com.google.code.findbugs:jsr305:3.0.2'
 	implementationProvided 'org.projectlombok:lombok:1.18.34'
@@ -109,6 +109,12 @@ tasks.register('buildCore', Jar) {
 
 	from sourceSets.core.output
 	archiveFileName = "seafoamy-core-${version}.jar"
+
+	configurations.implementationCompile.each { dep ->
+		from zipTree(dep).matching {
+			exclude 'META-INF/*'
+		}
+	}
 }
 
 tasks.register('buildPaper', Jar) {
@@ -117,6 +123,18 @@ tasks.register('buildPaper', Jar) {
 	from sourceSets.paper.output
 	from sourceSets.core.output
 	archiveFileName = "seafoamy-paper-${version}.jar"
+
+	configurations.implementationCompile.each { dep ->
+		from zipTree(dep).matching {
+			exclude 'META-INF/*'
+		}
+	}
+	configurations.paperCompile.each { dep ->
+		from zipTree(dep).matching {
+			exclude 'META-INF/*'
+			duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+		}
+	}
 }
 
 
