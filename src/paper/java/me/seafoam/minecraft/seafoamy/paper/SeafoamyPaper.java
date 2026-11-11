@@ -6,10 +6,10 @@ import lombok.Getter;
 import me.seafoam.minecraft.seafoamy.Seafoamy;
 import me.seafoam.minecraft.seafoamy.paper.command.CommandManagerPaper;
 import me.seafoam.minecraft.seafoamy.paper.command.ConsolePaper;
+import me.seafoam.minecraft.seafoamy.paper.event.PlayerConnectionListener;
 import me.seafoam.minecraft.seafoamy.paper.inventory.item.ItemInteractListener;
 import me.seafoam.minecraft.seafoamy.paper.inventory.item.ItemPacketListener;
 import me.seafoam.minecraft.seafoamy.paper.player.PlayerManagerPaper;
-import me.seafoam.minecraft.seafoamy.paper.event.PlayerConnectionListener;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 

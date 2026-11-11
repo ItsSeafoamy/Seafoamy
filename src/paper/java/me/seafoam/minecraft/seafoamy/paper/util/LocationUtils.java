@@ -14,7 +14,7 @@ public class LocationUtils {
 		World world;
 
 		if (location.getWorld() == null) {
-			world = Bukkit.getWorlds().get(0);
+			world = Bukkit.getWorlds().getFirst();
 		} else {
 			world = Bukkit.getWorld(location.getWorld());
 		}
