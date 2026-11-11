@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'me.seafoam.minecraft'
-version '1.2'
+version '1.1.0'
 
 compileJava.options.encoding = "UTF-8"
 
@@ -104,14 +104,6 @@ dependencies {
 	paperweight.paperDevBundle '26.3.build.+'
 }
 
-remotes {
-	web01 {
-		host = sshHost
-		user = sshUser
-		password = sshPassword
-	}
-}
-
 tasks.register('buildCore', Jar) {
 	group = 'all'
 
@@ -147,12 +139,6 @@ tasks.register('mavenCore') {
 	dependsOn 'buildCore'
 
 	doFirst {
-		ssh.run {
-			session(remotes.web01) {
-				remove sshMavenLocation + "/me/seafoam/minecraft/seafoamy-core/${version}"
-			}
-		}
-
 		generatePomFileForCorePublication.doGenerate()
 		publishCorePublicationToSeafoamyRepository.publish()
 	}
@@ -164,12 +150,6 @@ tasks.register('mavenPaper') {
 	dependsOn 'buildPaper'
 
 	doFirst {
-		ssh.run {
-			session(remotes.web01) {
-				remove sshMavenLocation + "/me/seafoam/minecraft/seafoamy-paper/${version}"
-			}
-		}
-
 		generatePomFileForPaperPublication.doGenerate()
 		publishPaperPublicationToSeafoamyRepository.publish()
 	}
@@ -195,7 +175,16 @@ publishing {
 
 			pom.withXml {
 				def dependenciesNode = asNode().appendNode('dependencies')
-				configurations.implementationResolvable.allDependencies.each {
+				configurations.implementationCompile.allDependencies.each {
+					if (it.group != null && it.name != null) {
+						def dependencyNode = dependenciesNode.appendNode('dependency')
+						dependencyNode.appendNode('groupId', it.group)
+						dependencyNode.appendNode('artifactId', it.name)
+						dependencyNode.appendNode('version', it.version)
+					}
+				}
+
+				configurations.implementationProvided.allDependencies.each {
 					if (it.group != null && it.name != null) {
 						def dependencyNode = dependenciesNode.appendNode('dependency')
 						dependencyNode.appendNode('groupId', it.group)
@@ -221,7 +210,16 @@ publishing {
 
 			pom.withXml {
 				def dependenciesNode = asNode().appendNode('dependencies')
-				configurations.paperImplementation.allDependencies.each {
+				configurations.paperCompile.allDependencies.each {
+					if (it.group != null && it.name != null) {
+						def dependencyNode = dependenciesNode.appendNode('dependency')
+						dependencyNode.appendNode('groupId', it.group)
+						dependencyNode.appendNode('artifactId', it.name)
+						dependencyNode.appendNode('version', it.version)
+					}
+				}
+
+				configurations.paperProvided.allDependencies.each {
 					if (it.group != null && it.name != null) {
 						def dependencyNode = dependenciesNode.appendNode('dependency')
 						dependencyNode.appendNode('groupId', it.group)
@@ -252,10 +250,10 @@ publishing {
 	repositories {
 		maven {
 			name = 'seafoamy'
-			url = 'sftp://' + sshHost + ':22' + sshMavenLocation
+			url = 'https://repo.seafoam.me/'
 			credentials {
-				username = sshUser
-				password = sshPassword
+				username = findProperty('clientId')
+				password = findProperty('clientSecret')
 			}
 		}
 	}
