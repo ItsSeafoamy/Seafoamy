@@ -1,19 +1,21 @@
 package me.seafoam.minecraft.seafoamy.text;
 
 import java.util.*;
-import java.util.regex.Pattern;
 import me.seafoam.minecraft.seafoamy.Seafoamy;
 import me.seafoam.minecraft.seafoamy.command.CommandExecutor;
 import me.seafoam.minecraft.seafoamy.player.OnlinePlayer;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.flattener.ComponentFlattener;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.Tag;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.object.ObjectContents;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public abstract class TextMessage {
@@ -31,6 +33,8 @@ public abstract class TextMessage {
 	protected int centerSize = TextUtils.CHAT_SIZE;
 	protected final HashMap<String, TextMessage> variables = new HashMap<>();
 	protected final List<TextMessage> appends = new ArrayList<>();
+
+	private static final LegacyComponentSerializer centerSerializer = LegacyComponentSerializer.legacySection().toBuilder().flattener(ComponentFlattener.textOnly()).build();
 
 	public TextMessage(String message, boolean parseTags) {
 		this.message = message;
@@ -148,26 +152,60 @@ public abstract class TextMessage {
 
 	public Component build(Language language) {
 		MiniMessage mm = MiniMessage.miniMessage();
-		List<TagResolver.Single> placeholders = new ArrayList<>(variables.size());
+		List<TagResolver> placeholders = new ArrayList<>(variables.size());
 
 		for (Map.Entry<String, TextMessage> entry : variables.entrySet()) {
 			placeholders.add(Placeholder.component(entry.getKey(), entry.getValue().build(language)));
 		}
 
+		placeholders.add(TagResolver.builder().tag("player", (argumentQueue, context) -> {
+			String player = argumentQueue.pop().value();
+
+			try {
+				UUID uuid = UUID.fromString(player);
+
+				return Tag.selfClosingInserting(Component.object(ObjectContents.playerHead(uuid)));
+			} catch (Exception e) {
+				return Tag.inserting(Component.object(ObjectContents.playerHead(player)));
+			}
+		}).build());
+
+		placeholders.add(TagResolver.builder().tag("sprite", (argumentQueue, context) -> {
+			String atlas = argumentQueue.pop().value();
+			String sprite = argumentQueue.pop().value();
+
+			return Tag.selfClosingInserting(Component.object(ObjectContents.sprite(Key.key(atlas), Key.key(sprite))));
+		}).build());
+
+		placeholders.add(TagResolver.builder().tag("translate", (argumentQueue, context) -> {
+			String toTranslate = argumentQueue.pop().value();
+
+			return Tag.selfClosingInserting(new TranslatedMessage(toTranslate).build(language));
+		}).build());
+
 		String message = this.message;
 		if (this instanceof TranslatedMessage) message = language.translate(message);
 
+		// Fix MiniMessage annoyingly not accepting legacy colour codes
+		message = ColourFixer.fix(message);
+
 		Component component;
-		if (parseTags) {
-			if (hasColour(message)) {
-				component = mm.deserialize(message, placeholders.toArray(new TagResolver.Single[0]));
-			} else {
-				component = mm.deserialize(message, placeholders.toArray(new TagResolver.Single[0])).color(colour);
-			}
-		}
-		else {
-			String m = mm.escapeTags(message);
-			component = mm.deserialize(m, placeholders.toArray(new TagResolver.Single[0])).color(colour);
+		if (this instanceof VanillaMessage) {
+			component = Component.translatable(message).color(colour);
+		} else if (this instanceof PlayerHeadMessage m) {
+			if (message.equals("name")) {
+				component = Component.object(ObjectContents.playerHead(m.name)).color(colour);
+			} else if (message.equals("uuid")) {
+				component = Component.object(ObjectContents.playerHead(m.uuid)).color(colour);
+			} else throw new IllegalStateException();
+		} else if (this instanceof SpriteMessage m) {
+			component = Component.object(ObjectContents.sprite(Key.key(message), Key.key(m.sprite))).color(colour);
+		} else if (parseTags) {
+			component = mm.deserialize(message, placeholders.toArray(new TagResolver[0]));
+			component = component.colorIfAbsent(colour);
+		} else {
+			String m = mm.escapeTags(message, placeholders.toArray(new TagResolver[0]));
+			component = mm.deserialize(m, placeholders.toArray(new TagResolver[0])).color(colour);
 		}
 
 		for (TextDecoration format : undecorations) {
@@ -186,29 +224,9 @@ public abstract class TextMessage {
 		}
 
 		if (center != (char) 0) {
-			String legacy = LegacyComponentSerializer.legacySection().serialize(component);
-			String padding = TextUtils.getPaddingForCenter(legacy, center, centerSize);
-			Component pre = component;
-
-			component = Component.text(padding).color(centerColour);
-
-			for (TextDecoration format : centerFormats) {
-				component = component.decorate(format);
-			}
-
-			component = Component.text("").append(component).append(pre).append(component);
+			component = TextUtils.centerMessage(component, center, centerSize, centerColour, centerFormats);
 		}
 
 		return component;
-	}
-
-	private boolean hasColour(String message) {
-		for (NamedTextColor colour : NamedTextColor.NAMES.values()) {
-			if (message.toLowerCase().startsWith("<" + colour + ">") && message.toLowerCase().endsWith("</" + colour + ">")) {
-				return true;
-			}
-		}
-
-		return Pattern.matches("^<#[0-9a-zA-Z]{6}>.*<\\/#[0-9a-zA-Z]{6}>$", message);
 	}
 }
