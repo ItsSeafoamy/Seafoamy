@@ -1,277 +1,67 @@
 plugins {
-	id 'java'
-	id 'org.hidetake.ssh' version '2.11.2'
+	id 'java-library'
+	id 'com.gradleup.shadow' version '9.6.1'
 	id 'maven-publish'
-	id 'io.papermc.paperweight.userdev' version '2.0.0-beta.24'
 }
-
-group 'me.seafoam.minecraft'
-version '1.1.0'
 
 compileJava.options.encoding = "UTF-8"
 
-configurations {
-	implementationProvided {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-	implementationCompile {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-	paperProvided {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-	paperCompile {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-	waterfallProvided {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-	waterfallCompile {
-		extendsFrom implementation
-		canBeResolved = true
-	}
-}
-
-sourceSets {
-	core {
-		java {
-			srcDirs = ['src/core/java']
-		}
-		compileClasspath += configurations.implementationProvided
-		runtimeClasspath += configurations.implementationProvided
-
-		compileClasspath += configurations.implementationCompile
-		runtimeClasspath += configurations.implementationCompile
-	}
-
-	paper {
-		java {
-			srcDirs = ['src/paper/java']
-		}
-		compileClasspath += core.output
-		runtimeClasspath += core.output
-
-		compileClasspath += configurations.implementationProvided
-		runtimeClasspath += configurations.implementationProvided
-
-		compileClasspath += configurations.implementationCompile
-		runtimeClasspath += configurations.implementationCompile
-
-		compileClasspath += configurations.paperProvided
-		runtimeClasspath += configurations.paperProvided
-
-		compileClasspath += configurations.paperCompile
-		runtimeClasspath += configurations.paperCompile
-	}
-}
-
-repositories {
-	mavenCentral()
-	maven {url 'https://repo.papermc.io/repository/maven-public/'}
-	maven {url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'}
-	maven {url 'https://repo.dmulloy2.net/repository/public/'}
-	maven {url 'https://libraries.minecraft.net/'}
-	maven {url 'https://repo.codemc.io/repository/maven-snapshots/'}
-	maven {url 'https://repo.seafoam.me'}
-	maven {url 'https://jitpack.io'}
-	maven {url 'https://m2.dv8tion.net/releases'}
-}
-
-dependencies {
-	implementationProvided 'net.kyori:adventure-api:5.2.0'
-	implementationProvided 'net.kyori:adventure-text-minimessage:5.2.0'
-	implementationProvided 'net.kyori:adventure-text-serializer-legacy:5.2.0'
-	implementationProvided 'net.kyori:adventure-text-serializer-gson:5.2.0'
-	implementationProvided 'com.google.code.gson:gson:2.9.1'
-	implementationProvided 'com.google.code.findbugs:jsr305:3.0.2'
-	implementationProvided 'org.projectlombok:lombok:1.18.34'
-	implementationProvided 'com.google.guava:guava:31.1-jre'
-	implementationProvided 'org.jetbrains:annotations:22.0.0'
-	implementationCompile 'com.zaxxer:HikariCP:5.0.1'
-
-	paperProvided 'io.papermc.paper:paper-api:26.3.build.+'
-	paperProvided 'com.mojang:authlib:3.11.50'
-	paperProvided 'com.comphenix.protocol:ProtocolLib:5.0.0'
-
-	coreAnnotationProcessor 'org.projectlombok:lombok:1.18.48'
-	paperAnnotationProcessor 'org.projectlombok:lombok:1.18.48'
-
-	paperweight.paperDevBundle '26.3.build.+'
-}
-
-tasks.register('buildCore', Jar) {
-	group = 'all'
-
-	from sourceSets.core.output
-	archiveFileName = "seafoamy-core-${version}.jar"
-
-	configurations.implementationCompile.each { dep ->
-		from zipTree(dep).matching {
-			exclude 'META-INF/*'
-		}
-	}
-}
-
-tasks.register('buildPaper', Jar) {
-	group = 'all'
-
-	from sourceSets.paper.output
-	from sourceSets.core.output
-	archiveFileName = "seafoamy-paper-${version}.jar"
-
-	configurations.implementationCompile.each { dep ->
-		from zipTree(dep).matching {
-			exclude 'META-INF/*'
-		}
-	}
-	configurations.paperCompile.each { dep ->
-		from zipTree(dep).matching {
-			exclude 'META-INF/*'
-			duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-		}
-	}
-}
-
-
-tasks.register("deployTestPaper") {
-	group = 'all'
-
-	dependsOn 'buildPaper'
-	doLast {
-		ssh.run {
-			session(remotes.web01) {
-				put from: "${buildDir}/libs/seafoamy-paper-${version}.jar", into: sshPluginLocation + "/seafoamy-paper.jar"
-			}
-		}
-	}
-}
-
-tasks.register('mavenCore') {
-	group 'all'
-
-	dependsOn 'buildCore'
-
-	doFirst {
-		generatePomFileForCorePublication.doGenerate()
-		publishCorePublicationToSeafoamyRepository.publish()
-	}
-}
-
-tasks.register('mavenPaper') {
-	group 'all'
-
-	dependsOn 'buildPaper'
-
-	doFirst {
-		generatePomFileForPaperPublication.doGenerate()
-		publishPaperPublicationToSeafoamyRepository.publish()
-	}
-}
-
-
-tasks.withType(JavaCompile) {
-	options.encoding = 'UTF-8'
-	options.release = 25
-}
-
-tasks.withType(GenerateModuleMetadata) {
-	enabled = false
-}
-
-publishing {
-	publications {
-		core(MavenPublication) {
-			groupId = 'me.seafoam.minecraft'
-			artifactId = 'seafoamy-core'
-
-			artifact tasks.buildCore
-
-			pom.withXml {
-				def dependenciesNode = asNode().appendNode('dependencies')
-				configurations.implementationCompile.allDependencies.each {
-					if (it.group != null && it.name != null) {
-						def dependencyNode = dependenciesNode.appendNode('dependency')
-						dependencyNode.appendNode('groupId', it.group)
-						dependencyNode.appendNode('artifactId', it.name)
-						dependencyNode.appendNode('version', it.version)
-					}
-				}
-
-				configurations.implementationProvided.allDependencies.each {
-					if (it.group != null && it.name != null) {
-						def dependencyNode = dependenciesNode.appendNode('dependency')
-						dependencyNode.appendNode('groupId', it.group)
-						dependencyNode.appendNode('artifactId', it.name)
-						dependencyNode.appendNode('version', it.version)
-					}
-				}
-
-				def repositoriesNode = asNode().appendNode('repositories')
-				project.repositories.each {
-					def repositoryNode = repositoriesNode.appendNode('repository')
-					repositoryNode.appendNode('id', it.name)
-					repositoryNode.appendNode('url', it.url)
-				}
-			}
-		}
-
-		paper(MavenPublication) {
-			groupId = 'me.seafoam.minecraft'
-			artifactId = 'seafoamy-paper'
-
-			artifact tasks.buildPaper
-
-			pom.withXml {
-				def dependenciesNode = asNode().appendNode('dependencies')
-				configurations.paperCompile.allDependencies.each {
-					if (it.group != null && it.name != null) {
-						def dependencyNode = dependenciesNode.appendNode('dependency')
-						dependencyNode.appendNode('groupId', it.group)
-						dependencyNode.appendNode('artifactId', it.name)
-						dependencyNode.appendNode('version', it.version)
-					}
-				}
-
-				configurations.paperProvided.allDependencies.each {
-					if (it.group != null && it.name != null) {
-						def dependencyNode = dependenciesNode.appendNode('dependency')
-						dependencyNode.appendNode('groupId', it.group)
-						dependencyNode.appendNode('artifactId', it.name)
-						dependencyNode.appendNode('version', it.version)
-					}
-				}
-
-				def dependencyNode = dependenciesNode.appendNode('dependency')
-				dependencyNode.appendNode('groupId', 'me.seafoam.minecraft')
-				dependencyNode.appendNode('artifactId', 'seafoamy-core')
-				dependencyNode.appendNode('version', version)
-
-				def repositoriesNode = asNode().appendNode('repositories')
-				project.repositories.each {
-					def repositoryNode = repositoriesNode.appendNode('repository')
-					repositoryNode.appendNode('id', it.name)
-					repositoryNode.appendNode('url', it.url)
-				}
-
-				def repositoryNode = repositoriesNode.appendNode('repository')
-				repositoryNode.appendNode('id', 'seafoamy')
-				repositoryNode.appendNode('url', 'https://repo.seafoam.me')
-			}
-		}
-	}
+allprojects {
+	group 'me.seafoam.minecraft'
+	version '1.1.1'
 
 	repositories {
-		maven {
-			name = 'seafoamy'
-			url = 'https://repo.seafoam.me/'
-			credentials {
-				username = findProperty('clientId')
-				password = findProperty('clientSecret')
+		mavenCentral()
+		maven {url 'https://repo.papermc.io/repository/maven-public/'}
+		maven {url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'}
+		maven {url 'https://repo.dmulloy2.net/repository/public/'}
+		maven {url 'https://libraries.minecraft.net/'}
+		maven {url 'https://repo.codemc.io/repository/maven-snapshots/'}
+		maven {url 'https://repo.seafoam.me'}
+		maven {url 'https://jitpack.io'}
+		maven {url 'https://m2.dv8tion.net/releases'}
+	}
+}
+
+subprojects {
+	apply plugin: 'java-library'
+	apply plugin: 'com.gradleup.shadow'
+	apply plugin: 'maven-publish'
+
+	dependencies {
+		compileOnlyApi 'net.kyori:adventure-api:5.2.0'
+		compileOnlyApi 'net.kyori:adventure-text-minimessage:5.2.0'
+		compileOnlyApi 'net.kyori:adventure-text-serializer-legacy:5.2.0'
+		compileOnlyApi 'net.kyori:adventure-text-serializer-gson:5.2.0'
+		compileOnlyApi 'com.google.code.gson:gson:2.9.1'
+		compileOnlyApi 'com.google.code.findbugs:jsr305:3.0.2'
+		compileOnlyApi 'org.projectlombok:lombok:1.18.34'
+		compileOnlyApi 'com.google.guava:guava:31.1-jre'
+		compileOnlyApi 'org.jetbrains:annotations:22.0.0'
+
+		annotationProcessor 'org.projectlombok:lombok:1.18.48'
+	}
+
+	tasks.withType(JavaCompile) {
+		options.encoding = 'UTF-8'
+		options.release = 25
+	}
+
+	publishing {
+		repositories {
+			maven {
+				name = 'seafoamy'
+				url = 'https://repo.seafoam.me'
+				credentials {
+					username = findProperty('clientId')
+					password = findProperty('clientSecret')
+				}
+			}
+		}
+
+		publications {
+			mavenJava(MavenPublication) {
+				from components.java
 			}
 		}
 	}

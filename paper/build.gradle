@@ -1,0 +1,17 @@
+plugins {
+	id 'io.papermc.paperweight.userdev' version '2.0.0-beta.24'
+}
+
+dependencies {
+	implementation project(":core")
+
+	compileOnlyApi 'io.papermc.paper:paper-api:26.3.build.+'
+	compileOnlyApi 'com.mojang:authlib:3.11.50'
+	compileOnlyApi 'com.comphenix.protocol:ProtocolLib:5.0.0'
+
+	paperweight.paperDevBundle '26.3.build.+'
+}
+
+processResources {
+	expand(version: project.version)
+}
